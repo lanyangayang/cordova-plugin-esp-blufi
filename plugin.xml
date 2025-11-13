@@ -1,0 +1,16 @@
+<plugin id="cordova-plugin-esp-blufi" version="1.0.0" xmlns="http://apache.org/cordova/ns/plugins/1.0">
+  <name>EspBluFi</name>
+  <js-module src="www/blufi.js" name="Blufi">
+    <clobbers target="Blufi" />
+  </js-module>
+  <platform name="android">
+    <config-file target="res/xml/config.xml" parent="/*">
+      <feature name="Blufi">
+        <param name="android-package" value="com.yourcompany.blufi.BlufiPlugin" />
+      </feature>
+    </config-file>
+    <source-file src="src/android/BlufiPlugin.java" target-dir="src/com/yourcompany/blufi" />
+    <framework src="src/android/jitpack.gradle" custom="true" />
+    <framework src="com.github.lanyangayang:blufi-wrapper:v1.0.0@aar" />
+  </platform>
+</plugin>
