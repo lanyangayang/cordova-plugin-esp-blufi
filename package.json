@@ -1,0 +1,13 @@
+{
+"name": "cordova-plugin-esp-blufi",
+"version": "1.0.0",
+"description": "Espressif BluFi Cordova plugin for Android",
+"cordova": {
+"id": "cordova-plugin-esp-blufi",
+"platforms": ["android"]
+},
+"keywords": ["cordova", "bluetooth", "blufi", "android"],
+"author": "lanyangayang",
+"license": "Apache-2.0",
+"files": ["plugin.xml", "src", "www"]
+}
