@@ -1,0 +1,14 @@
+repositories{
+    maven { url 'https://jitpack.io' }
+}
+
+dependencies {
+    implementation 'com.github.EspressifApp:lib-blufi-android:2.4.1'
+}
+
+android {
+    packagingOptions {
+        exclude 'META-INF/NOTICE'
+        exclude 'META-INF/LICENSE'
+    }
+}

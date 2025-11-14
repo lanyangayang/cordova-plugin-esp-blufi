@@ -11,6 +11,6 @@
     </config-file>
     <source-file src="src/android/BlufiPlugin.java" target-dir="src/com/yourcompany/blufi" />
     <framework src="src/android/jitpack.gradle" custom="true" />
-    <framework src="com.github.lanyangayang:blufi-wrapper:v1.0.0" />
+    <framework src="src/android/blufi.gradle" custom="true" />
   </platform>
 </plugin>
