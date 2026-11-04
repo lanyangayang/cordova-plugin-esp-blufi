@@ -13,16 +13,42 @@ npx cap sync android
 
 ## 二、Android 配置
 
-在 `AndroidManifest.xml` 添加权限：
+**1.0.2 起插件已在 `plugin.xml` 里声明所需权限**，安装时自动合并进 `AndroidManifest.xml`，
+无需手工添加：
 
-```xml
-<uses-permission android:name="android.permission.BLUETOOTH" />
-<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
-<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-<uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
-<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+| 权限 | 适用版本 | 说明 |
+| --- | --- | --- |
+| `BLUETOOTH` / `BLUETOOTH_ADMIN` | Android ≤ 11（`maxSdkVersion=30`） | 旧版蓝牙 |
+| `ACCESS_FINE_LOCATION` | Android ≤ 11（`maxSdkVersion=30`） | 旧版扫描蓝牙必需 |
+| `BLUETOOTH_SCAN` / `BLUETOOTH_CONNECT` | Android 12+ | 新版蓝牙 |
+| `ACCESS_WIFI_STATE` / `CHANGE_WIFI_STATE` | 全版本 | 普通权限，安装即授予 |
+
+> 若你的工程此前手工加过，保留也无副作用（manifest 合并会去重）。
+
+**2. 运行时仍需动态申请**（危险权限），两种方式任选：
+
+```javascript
+// 方式一：使用插件自带动作（推荐，权限清单与原生实现一致）
+document.addEventListener('deviceready', () => {
+  Blufi.hasPermissions(
+    (granted) => {
+      if (!granted) {
+        Blufi.requestPermissions(
+          () => console.log('权限已授予'),
+          (err) => console.warn('权限被拒绝', err),
+        );
+      }
+    },
+    (err) => console.warn(err),
+  );
+});
 ```
+
+```javascript
+// 方式二：用你工程里已有的权限插件（如 @awesome-cordova-plugins/android-permissions）
+```
+
+> 没拿到权限时，`scan()` 会失败或扫不到设备 —— 这是最常见的「插件没反应」原因。
 
 ---
 

@@ -1,16 +1,52 @@
-<plugin id="cordova-plugin-esp-blufi" version="1.0.1" xmlns="http://apache.org/cordova/ns/plugins/1.0">
+<plugin id="cordova-plugin-esp-blufi" version="1.0.2"
+        xmlns="http://apache.org/cordova/ns/plugins/1.0"
+        xmlns:android="http://schemas.android.com/apk/res/android">
+
   <name>EspBluFi</name>
+  <description>Espressif BluFi 配网插件（Android）：BLE 扫描 / 连接 / 协商密钥 / 下发 WiFi 配置。</description>
+  <license>Apache-2.0</license>
+  <keywords>cordova,bluetooth,ble,blufi,espressif,provisioning,android</keywords>
+
+  <engines>
+    <engine name="cordova-android" version=">=10.0.0" />
+  </engines>
+
   <js-module src="www/blufi.js" name="Blufi">
     <clobbers target="Blufi" />
   </js-module>
+
   <platform name="android">
+
     <config-file target="res/xml/config.xml" parent="/*">
       <feature name="Blufi">
         <param name="android-package" value="com.acme.blufi.BlufiPlugin" />
       </feature>
     </config-file>
+
+    <!--
+      BLE 配网所需权限。插件只负责「声明」，运行时仍需动态申请：
+      调用 Blufi.requestPermissions() 或自行用权限插件申请。
+      与 BlufiPlugin.requiredPermissions() 保持一致：
+        Android 12+ (SDK 31)：BLUETOOTH_SCAN / BLUETOOTH_CONNECT
+        Android 11- (SDK <31)：BLUETOOTH / BLUETOOTH_ADMIN / ACCESS_FINE_LOCATION
+        Wi-Fi 状态两个是普通权限，安装即授予。
+    -->
+    <config-file target="AndroidManifest.xml" parent="/*">
+      <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+      <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+      <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
+      <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+      <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+      <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+      <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+      <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
+    </config-file>
+
     <source-file src="src/android/BlufiPlugin.java" target-dir="src/com/acme/blufi" />
-    <framework src="src/android/jitpack.gradle" custom="true" />
+
+    <!-- blufi.gradle 已包含 jitpack 仓库与 lib-blufi-android 依赖 -->
     <framework src="src/android/blufi.gradle" custom="true" type="gradleReference" />
+
   </platform>
+
 </plugin>

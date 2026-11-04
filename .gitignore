@@ -1,0 +1,18 @@
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.DS_Store
+
+# Node
+node_modules/
+npm-debug.log
+
+# Cordova
+platforms/
+plugins/
+
+# npm pack
+*.tgz
