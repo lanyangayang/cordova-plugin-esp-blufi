@@ -6,6 +6,7 @@ import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothProfile;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanResult;
@@ -324,10 +325,16 @@ public class BlufiPlugin extends CordovaPlugin {
                 try {
                     data.put("status", status);
                     if (resp != null) {
+                        int staConn = resp.getStaConnectionStatus();
                         data.put("opMode", resp.getOpMode());
                         data.put("staSSID", resp.getStaSSID());
                         data.put("staBSSID", resp.getStaBSSID());
-                        data.put("staConnStatus", resp.getStaConnectionStatus());
+                        data.put("staConnStatus", staConn);
+                        // 语义：0=已连接且已拿到 IP；1=连接失败；2=连接中；3=已关联 AP 但还没拿到 IP
+                        data.put("staConnStatusName", staConnStatusName(staConn));
+                        data.put("staConnected", staConn == 0);
+                        // 人类可读的状态说明（含 reason code / RSSI / WRONG PASSWORD 等诊断信息）
+                        try { data.put("staValidInfo", resp.generateValidInfo()); } catch (Throwable ignore) {}
                         data.put("softAPSSID", resp.getSoftAPSSID());
                         data.put("softAPChannel", resp.getSoftAPChannel());
                         data.put("softAPMaxConn", resp.getSoftAPMaxConnectionCount());
@@ -356,10 +363,24 @@ public class BlufiPlugin extends CordovaPlugin {
             }
             @Override
             public void onError(BlufiClient client, int errCode) {
-                sendEvent("error", kv("code", errCode));
+                // GATT 写超时意味着链路已失效：同时视为断开，避免上层继续对死链路轮询
+                boolean linkDead = (errCode == BlufiCallback.CODE_GATT_WRITE_TIMEOUT);
+                sendEvent("error", kv("code", errCode, "name", errorCodeName(errCode), "linkDead", linkDead));
+                if (linkDead) {
+                    onLinkLost(BluetoothGatt.GATT_FAILURE, BluetoothProfile.STATE_DISCONNECTED);
+                }
             }
         });
         client.setGattCallback(new BluetoothGattCallback() {
+            @Override
+            public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
+                // 关键：设备侧主动断开（配网成功后常见：固件断开 BLE 或重启）必须通知 JS，
+                // 否则上层永远等不到 gattPrepared/disconnected，会一直卡在“配网中”
+                if (status == BluetoothGatt.GATT_SUCCESS && newState == BluetoothProfile.STATE_CONNECTED) {
+                    return;
+                }
+                onLinkLost(status, newState);
+            }
             @Override
             public void onMtuChanged(BluetoothGatt gatt, int mtu, int status) {
                 currentMtu = mtu;
@@ -376,6 +397,80 @@ public class BlufiPlugin extends CordovaPlugin {
         });
         client.connect();
         sendEvent("connecting", kv("address", address));
+    }
+    /**
+     * 链路丢失统一处理：复位内部状态、通知 JS（disconnected 事件），并异步释放 GATT 资源。
+     * status/newState 直接透传 Android 的 GATT 回调值，便于上层判断是"正常断开"还是"错误断开"。
+     */
+    private void onLinkLost(int status, int newState) {
+        boolean wasPrepared = gattPreparedOk;
+        gattPreparedOk = false;
+        mtuReady = false;
+        currentMtu = -1;
+        String addr = null;
+        try {
+            addr = currentDevice != null ? currentDevice.getAddress() : null;
+        } catch (Throwable ignore) {}
+        JSONObject data = new JSONObject();
+        try {
+            data.put("status", status);
+            data.put("newState", newState);
+            data.put("address", addr);
+            data.put("wasPrepared", wasPrepared);
+        } catch (JSONException ignored) {}
+        sendEvent("disconnected", data);
+        closeClientQuietly();
+    }
+    /**
+     * 异步释放 BlufiClient。
+     * 不能在 GATT 回调线程里同步 close()：库内部 close() 是同步方法，而写线程可能正持有锁等 ACK（最长 GATT 写超时）。
+     */
+    private void closeClientQuietly() {
+        final BlufiClient c = client;
+        if (c == null) return;
+        client = null;
+        try {
+            cordova.getThreadPool().execute(() -> {
+                try { c.close(); } catch (Throwable ignore) {}
+            });
+        } catch (Throwable t) {
+            try { c.close(); } catch (Throwable ignore) {}
+        }
+    }
+    /** STA 连接状态码转可读名称（与 lib-blufi 的 BlufiParameter.STA_CONN_* 对应） */
+    private String staConnStatusName(int staConn) {
+        switch (staConn) {
+            case 0: return "connected";   // 已连接并拿到 IP
+            case 1: return "failed";      // 连接失败
+            case 2: return "connecting";  // 连接中
+            case 3: return "noIp";        // 已关联 AP，但还没拿到 IP
+            default: return "unknown";
+        }
+    }
+    /** BlufiCallback 错误码转可读名称，便于 JS 侧区分"密码错/找不到 AP/写超时"等 */
+    private String errorCodeName(int code) {
+        switch (code) {
+            case BlufiCallback.STATUS_SUCCESS: return "SUCCESS";
+            case BlufiCallback.CODE_INVALID_NOTIFICATION: return "INVALID_NOTIFICATION";
+            case BlufiCallback.CODE_CATCH_EXCEPTION: return "CATCH_EXCEPTION";
+            case BlufiCallback.CODE_WRITE_DATA_FAILED: return "WRITE_DATA_FAILED";
+            case BlufiCallback.CODE_INVALID_DATA: return "INVALID_DATA";
+            case BlufiCallback.CODE_NEG_POST_FAILED: return "NEG_POST_FAILED";
+            case BlufiCallback.CODE_NEG_ERR_DEV_KEY: return "NEG_ERR_DEV_KEY";
+            case BlufiCallback.CODE_NEG_ERR_SECURITY: return "NEG_ERR_SECURITY";
+            case BlufiCallback.CODE_NEG_ERR_SET_SECURITY: return "NEG_ERR_SET_SECURITY";
+            case BlufiCallback.CODE_CONF_INVALID_OPMODE: return "CONF_INVALID_OPMODE";
+            case BlufiCallback.CODE_CONF_ERR_SET_OPMODE: return "CONF_ERR_SET_OPMODE";
+            case BlufiCallback.CODE_CONF_ERR_POST_STA: return "CONF_ERR_POST_STA";
+            case BlufiCallback.CODE_CONF_ERR_POST_SOFTAP: return "CONF_ERR_POST_SOFTAP";
+            case BlufiCallback.CODE_GATT_WRITE_TIMEOUT: return "GATT_WRITE_TIMEOUT";
+            case BlufiCallback.CODE_GATT_DISCOVER_SERVICE_FAILED: return "GATT_DISCOVER_SERVICE_FAILED";
+            case BlufiCallback.CODE_GATT_DISCOVER_WRITE_CHAR_FAILED: return "GATT_DISCOVER_WRITE_CHAR_FAILED";
+            case BlufiCallback.CODE_GATT_DISCOVER_NOTIFY_CHAR_FAILED: return "GATT_DISCOVER_NOTIFY_CHAR_FAILED";
+            case BlufiCallback.CODE_GATT_ERR_OPEN_NOTIFY: return "GATT_ERR_OPEN_NOTIFY";
+            case BlufiCallback.CODE_WIFI_SCAN_FAIL: return "WIFI_SCAN_FAIL";
+            default: return "UNKNOWN_" + code;
+        }
     }
     private void sendEvent(String type, JSONObject payload) {
         if (eventChannel == null) return;

@@ -1,6 +1,6 @@
 {
   "name": "cordova-plugin-esp-blufi",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Espressif BluFi 配网 Cordova 插件（Android）：BLE 扫描 / 连接 / 协商密钥 / 下发 WiFi 配置。",
   "cordova": {
     "id": "cordova-plugin-esp-blufi",
