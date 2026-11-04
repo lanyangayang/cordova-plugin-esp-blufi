@@ -1,4 +1,4 @@
-package com.yourcompany.blufi;
+package com.acme.blufi;
 import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;

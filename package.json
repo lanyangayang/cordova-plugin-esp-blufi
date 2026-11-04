@@ -1,6 +1,6 @@
 {
 "name": "cordova-plugin-esp-blufi",
-"version": "1.0.0",
+"version": "1.0.1",
 "description": "Espressif BluFi Cordova plugin for Android",
 "cordova": {
 "id": "cordova-plugin-esp-blufi",
